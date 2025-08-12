@@ -250,6 +250,7 @@ if __name__ == "__main__":
     crud.create_relationship("role", "Welstandscommissie", "fase", "Ontwerp", "WORKS_IN", {})
 
     # Vergunning
+    crud.create_relationship("role", "Opdrachtgever", "fase", "Initiatief", "WORKS_IN", {})
     crud.create_relationship("role", "Gemeenteambtenaar", "fase", "Vergunning", "WORKS_IN", {})
     crud.create_relationship("role", "Jurist / Vergunningenadviseur", "fase", "Vergunning", "WORKS_IN", {})
     crud.create_relationship("role", "Omgevingsmanager", "fase", "Vergunning", "WORKS_IN", {})
@@ -279,6 +280,21 @@ if __name__ == "__main__":
     crud.create_relationship("role", "Klantcontact / Klachtenafhandeling", "fase", "Beheer", "WORKS_IN", {})
     crud.create_relationship("role", "Koper / Bewoner", "fase", "Beheer", "WORKS_IN", {})
 
+    crud.create_node("category", {"name": "Communicatie"})
+    crud.create_node("category", {"name": "Ontwerp"})
+    crud.create_node("category", {"name": "Engeneering"})
+    crud.create_node("category", {"name": "BIM"})
+    crud.create_node("category", {"name": "Planning"})
+    crud.create_node("category", {"name": "Calculatie"})
+    crud.create_node("category", {"name": "Kostenbeheer"})
+    crud.create_node("category", {"name": "Vergunningen"})
+    crud.create_node("category", {"name": "GIS"})
+    crud.create_node("category", {"name": "Logistiek"})
+    crud.create_node("category", {"name": "Inkoop"})
+    crud.create_node("category", {"name": "Kwaliteit"})
+    crud.create_node("category", {"name": "Oplevering"})
+    crud.create_node("category", {"name": "Onderhoud"})
+    crud.create_node("category", {"name": "Beheer"})
 
 
     # crud.delete_node("software", "Neo4j")
