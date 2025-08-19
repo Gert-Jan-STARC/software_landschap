@@ -1,8 +1,8 @@
 import streamlit as st
 from methodes.crud_methodes import GraphCrud
+from methodes.custom_methodes import node_configuration
 
 crud = GraphCrud()
-node_types = ["category", "company", "fase", "role", "software"]
 
 # data models for each node type
 # "str" for string input, "txt" for text area, list for selectbox
@@ -15,7 +15,7 @@ node_configuration = {
 }
 
 st.subheader("Add a new node here.")
-node_type = st.selectbox("Select node type", node_types)
+node_type = st.selectbox("Select node type", node_configuration.keys())
 
 if node_type != "":
     with st.form(f"add_{node_type}_form", clear_on_submit=True):

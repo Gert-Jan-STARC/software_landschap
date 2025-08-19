@@ -122,7 +122,7 @@ class GraphCrud:
             result = session.run(query, name=name).single()
             return result["deleted_count"] > 0
         
-    def create_relationship(self, start_label, start_name, end_label, end_name, relationship_type, properties=None):
+    def create_relation_by_name(self, start_label, start_name, end_label, end_name, relationship_type, properties=None): 
         """Create a relationship between two nodes identified by name."""
         with self._driver.session() as session:
             query = (
@@ -298,6 +298,9 @@ if __name__ == "__main__":
     crud.create_node("category", {"name": "Oplevering"})
     crud.create_node("category", {"name": "Onderhoud"})
     crud.create_node("category", {"name": "Beheer"})
+
+    crud.create_node("software", {"name": "Revit", "description": "BIM software voor architecten en ingenieurs.", "subscription model": "Tiered pricing"})
+    crud.create_node("company", {"name": "Autodesk", "address": "111 McInnis Parkway, San Rafael, CA 94903, USA", "website": "https://www.autodesk.com", "telefoonnummer": "+1 800-964-6432", "emailaddress": "info@autodesk.com", "description": "Autodesk is a software company that makes software for architecture, engineering, construction, manufacturing, media, and entertainment industries."})
 
 
     crud.delete_node("software", "Neo4j")
