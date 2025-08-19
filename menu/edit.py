@@ -20,7 +20,7 @@ selected_nodes = crud.get_nodes_by_type(node_type)
 selected_node = st.selectbox("Select existing node", options=selected_nodes)
 node_properties = crud.read_node_properties_by_name(node_type, selected_node)
 
-if node_type != "":
+if node_properties:
     with st.form(f"add_{node_type}_form", clear_on_submit=False):  # don't clear, so edits stay visible
         st.subheader(f"Edit {node_type}")
 

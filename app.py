@@ -2,6 +2,10 @@ import streamlit as st
 from methodes.custom_methodes import remove_top_margin
 
 remove_top_margin()
+
+st.logo(image="images/logo.png", link="https://www.digigo.nu", size="medium")
+
+
 pages = {
 "CRUD": [
     st.Page("menu/add.py", title="Add node", icon="➕"),

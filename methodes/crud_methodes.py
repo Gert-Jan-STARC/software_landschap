@@ -146,158 +146,158 @@ if __name__ == "__main__":
     # Example usage
     crud = GraphCrud()
     crud.clear_database()
-    # crud.create_node("fase", {"name": "Initiatief", "description": 
-    # "Wat gebeurt er? Eerste idee of behoefte aan woningen (door gemeente, ontwikkelaar, corporatie of particulier). "
-    # "Globale verkenning van de locatie, haalbaarheid en doelgroepen. "
-    # "Belangrijke activiteiten: Locatieonderzoek (bestemmingsplan, eigendom, omgevingsfactoren). Marktanalyse en indicatie "
-    # "van kosten/baten. Globaal programma van eisen (hoeveel woningen, type, duurzaamheid)."})
+    crud.create_node("fase", {"name": "Initiatief", "description": 
+    "Wat gebeurt er? Eerste idee of behoefte aan woningen (door gemeente, ontwikkelaar, corporatie of particulier). "
+    "Globale verkenning van de locatie, haalbaarheid en doelgroepen. "
+    "Belangrijke activiteiten: Locatieonderzoek (bestemmingsplan, eigendom, omgevingsfactoren). Marktanalyse en indicatie "
+    "van kosten/baten. Globaal programma van eisen (hoeveel woningen, type, duurzaamheid)."})
 
-    # crud.create_node("fase", {"name": "Haalbaarheid", "description": 
-    # "Wat gebeurt er? Uitwerken van een eerste ontwerpconcept en kostenraming. Toetsen of het plan financieel, technisch, "
-    # "juridisch en maatschappelijk haalbaar is. "
-    # "Belangrijke activiteiten: Stedenbouwkundig schetsontwerp. Overleg met gemeente en andere stakeholders. "
-    # "Eventuele participatie met omwonenden. Risicoanalyse. Opstellen businesscase."})
+    crud.create_node("fase", {"name": "Haalbaarheid", "description": 
+    "Wat gebeurt er? Uitwerken van een eerste ontwerpconcept en kostenraming. Toetsen of het plan financieel, technisch, "
+    "juridisch en maatschappelijk haalbaar is. "
+    "Belangrijke activiteiten: Stedenbouwkundig schetsontwerp. Overleg met gemeente en andere stakeholders. "
+    "Eventuele participatie met omwonenden. Risicoanalyse. Opstellen businesscase."})
 
-    # crud.create_node("fase", {"name": "Ontwerp", "description": 
-    # "Wat gebeurt er? Van schetsontwerp naar definitief ontwerp. "
-    # "Belangrijke activiteiten: Schetsontwerp (SO) ruimtelijke opzet, massa en situering. "
-    # "Voorlopig Ontwerp (VO): materialen, plattegronden, gevels. Definitief Ontwerp (DO): alle details, constructies en installaties uitgewerkt. "
-    # "Duurzaamheids- en energieconcept."})
+    crud.create_node("fase", {"name": "Ontwerp", "description": 
+    "Wat gebeurt er? Van schetsontwerp naar definitief ontwerp. "
+    "Belangrijke activiteiten: Schetsontwerp (SO) ruimtelijke opzet, massa en situering. "
+    "Voorlopig Ontwerp (VO): materialen, plattegronden, gevels. Definitief Ontwerp (DO): alle details, constructies en installaties uitgewerkt. "
+    "Duurzaamheids- en energieconcept."})
 
-    # crud.create_node("fase", {"name": "Vergunning", "description": 
-    # "Wat gebeurt er? Aanvragen van de Omgevingsvergunning (bouw, milieu, eventueel sloop). "
-    # "Plan wordt formeel getoetst aan het bestemmingsplan, bouwbesluit, welstand. "
-    # "Belangrijke activiteiten: Indienen complete aanvraag bij de gemeente. Eventuele bezwaarprocedures door derden. Definitieve goedkeuring verkrijgen."})
+    crud.create_node("fase", {"name": "Vergunning", "description": 
+    "Wat gebeurt er? Aanvragen van de Omgevingsvergunning (bouw, milieu, eventueel sloop). "
+    "Plan wordt formeel getoetst aan het bestemmingsplan, bouwbesluit, welstand. "
+    "Belangrijke activiteiten: Indienen complete aanvraag bij de gemeente. Eventuele bezwaarprocedures door derden. Definitieve goedkeuring verkrijgen."})
 
-    # crud.create_node("fase", {"name": "Engineering", "description": 
-    # "Wat gebeurt er? Selecteren van aannemer (aanbesteding of onderhandse gunning). Opstellen contracten. "
-    # "Belangrijke activiteiten: Werkvoorbereiding door de aannemer (uitvoeringsplannen, inkoop materialen). "
-    # "Eventueel bouwrijp maken van de grond (nutsvoorzieningen, infrastructuur)."})
+    crud.create_node("fase", {"name": "Engineering", "description": 
+    "Wat gebeurt er? Selecteren van aannemer (aanbesteding of onderhandse gunning). Opstellen contracten. "
+    "Belangrijke activiteiten: Werkvoorbereiding door de aannemer (uitvoeringsplannen, inkoop materialen). "
+    "Eventueel bouwrijp maken van de grond (nutsvoorzieningen, infrastructuur)."})
 
-    # crud.create_node("fase", {"name": "Uitvoering", "description": 
-    # "Wat gebeurt er? Fysieke bouw van de woningen. "
-    # "Belangrijke activiteiten: Grondwerk, fundering, ruwbouw, afbouw. Kwaliteitscontroles en bouwtoezicht. "
-    # "Eventuele aanpassingen tijdens de bouw."})
+    crud.create_node("fase", {"name": "Uitvoering", "description": 
+    "Wat gebeurt er? Fysieke bouw van de woningen. "
+    "Belangrijke activiteiten: Grondwerk, fundering, ruwbouw, afbouw. Kwaliteitscontroles en bouwtoezicht. "
+    "Eventuele aanpassingen tijdens de bouw."})
 
-    # crud.create_node("fase", {"name": "Oplevering", "description": 
-    # "Wat gebeurt er? Officiële overdracht van woningen aan kopers/huurders. "
-    # "Belangrijke activiteiten: Eindinspectie en opleverrapport. Verhelpen van opleverpunten. Overdracht documentatie (garanties, handleidingen)."})
+    crud.create_node("fase", {"name": "Oplevering", "description": 
+    "Wat gebeurt er? Officiële overdracht van woningen aan kopers/huurders. "
+    "Belangrijke activiteiten: Eindinspectie en opleverrapport. Verhelpen van opleverpunten. Overdracht documentatie (garanties, handleidingen)."})
 
-    # crud.create_node("fase", {"name": "Beheer", "description": 
-    # "Wat gebeurt er? Ondersteuning bewoners bij gebreken. Eventuele garantieclaims. "
-    # "Belangrijke activiteiten: Nazorgperiode (meestal 3–6 maanden of 1 jaar). Overdracht aan VvE of beheerorganisatie."})
+    crud.create_node("fase", {"name": "Beheer", "description": 
+    "Wat gebeurt er? Ondersteuning bewoners bij gebreken. Eventuele garantieclaims. "
+    "Belangrijke activiteiten: Nazorgperiode (meestal 3–6 maanden of 1 jaar). Overdracht aan VvE of beheerorganisatie."})
 
-    # crud.create_relationship("fase", "Initiatief", "fase", "Haalbaarheid", "NEXT", {} )
-    # crud.create_relationship("fase", "Haalbaarheid", "fase", "Ontwerp", "NEXT", {})
-    # crud.create_relationship("fase", "Ontwerp", "fase", "Vergunning", "NEXT", {})
-    # crud.create_relationship("fase", "Vergunning", "fase", "Engineering", "NEXT ", {})
-    # crud.create_relationship("fase", "Engineering", "fase", "Uitvoering", "NEXT", {})
-    # crud.create_relationship("fase", "Uitvoering", "fase", "Oplevering", "NEXT", {})
-    # crud.create_relationship("fase", "Oplevering", "fase", "Beheer", "NEXT", {})
+    crud.create_relationship("fase", "Initiatief", "fase", "Haalbaarheid", "NEXT", {} )
+    crud.create_relationship("fase", "Haalbaarheid", "fase", "Ontwerp", "NEXT", {})
+    crud.create_relationship("fase", "Ontwerp", "fase", "Vergunning", "NEXT", {})
+    crud.create_relationship("fase", "Vergunning", "fase", "Engineering", "NEXT ", {})
+    crud.create_relationship("fase", "Engineering", "fase", "Uitvoering", "NEXT", {})
+    crud.create_relationship("fase", "Uitvoering", "fase", "Oplevering", "NEXT", {})
+    crud.create_relationship("fase", "Oplevering", "fase", "Beheer", "NEXT", {})
 
-    # crud.create_node("role", {"name": "Projectontwikkelaar", "description": 
-    #     "Coördineert en ontwikkelt het bouwproject van initiatief tot oplevering."})
-    # crud.create_node("role", {"name": "Gemeente", "description":
-    #     "Toezichthouder en vergunningverlener namens de overheid."})
-    # crud.create_node("role", {"name": "Stedenbouwkundige", "description": 
-    #     "Ontwerpt de ruimtelijke opzet van een gebied, inclusief infrastructuur en inrichting."})
-    # crud.create_node("role", {"name": "Architect", "description": 
-    #     "Maakt het ontwerp van de woning en de uitstraling ervan."})
-    # crud.create_node("role", {"name": "Constructeur", "description": 
-    #     "Zorgt dat het ontwerp technisch veilig en uitvoerbaar is."})
-    # crud.create_node("role", {"name": "Installateur", "description": 
-    #     "Ontwerpt technische installaties zoals verwarming, ventilatie en elektra."})
-    # crud.create_node("role", {"name": "Inkoopmanager", "description": 
-    #     "Regelt de inkoop van materialen en diensten voor het project."})
-    # crud.create_node("role", {"name": "Omgevingsmanager", "description": 
-    #     "Beheert communicatie en belangen van omwonenden en stakeholders."})
-    # crud.create_node("role", {"name": "Aannemer", "description": 
-    #     "Voert de bouw uit en draagt zorg voor het bouwproces."})
-    # crud.create_node("role", {"name": "Werkvoorbereider", "description": 
-    #     "Bereidt de uitvoering voor, regelt planning, materialen en logistiek."})
-    # crud.create_node("role", {"name": "Uitvoerder", "description": 
-    #     "Toezicht op de dagelijkse gang van zaken op de bouwplaats."})
-    # crud.create_node("role", {"name": "Veiligheidscoördinator (VGM)", "description": 
-    #     "Zorgt voor naleving van veiligheids-, gezondheids- en milieuregels."})
-    # crud.create_node("role", {"name": "Kwaliteitsinspecteur", "description": 
-    #     "Controleert of het werk voldoet aan de afgesproken kwaliteitseisen."})
-    # crud.create_node("role", {"name": "Opzichter", "description": 
-    #     "Houdt toezicht namens opdrachtgever op het bouwproces."})
-    # crud.create_node("role", {"name": "Beheerder", "description": 
-    #     "Beheert het onderhoud en de gemeenschappelijke zaken van een wooncomplex."})
-    # crud.create_node("role", {"name": "Leverancier", "description": 
-    #     "Levert materialen en producten die nodig zijn voor de bouw."})
+    crud.create_node("role", {"name": "Projectontwikkelaar", "description": 
+        "Coördineert en ontwikkelt het bouwproject van initiatief tot oplevering."})
+    crud.create_node("role", {"name": "Gemeente", "description":
+        "Toezichthouder en vergunningverlener namens de overheid."})
+    crud.create_node("role", {"name": "Stedenbouwkundige", "description": 
+        "Ontwerpt de ruimtelijke opzet van een gebied, inclusief infrastructuur en inrichting."})
+    crud.create_node("role", {"name": "Architect", "description": 
+        "Maakt het ontwerp van de woning en de uitstraling ervan."})
+    crud.create_node("role", {"name": "Constructeur", "description": 
+        "Zorgt dat het ontwerp technisch veilig en uitvoerbaar is."})
+    crud.create_node("role", {"name": "Installateur", "description": 
+        "Ontwerpt technische installaties zoals verwarming, ventilatie en elektra."})
+    crud.create_node("role", {"name": "Inkoopmanager", "description": 
+        "Regelt de inkoop van materialen en diensten voor het project."})
+    crud.create_node("role", {"name": "Omgevingsmanager", "description": 
+        "Beheert communicatie en belangen van omwonenden en stakeholders."})
+    crud.create_node("role", {"name": "Aannemer", "description": 
+        "Voert de bouw uit en draagt zorg voor het bouwproces."})
+    crud.create_node("role", {"name": "Werkvoorbereider", "description": 
+        "Bereidt de uitvoering voor, regelt planning, materialen en logistiek."})
+    crud.create_node("role", {"name": "Uitvoerder", "description": 
+        "Toezicht op de dagelijkse gang van zaken op de bouwplaats."})
+    crud.create_node("role", {"name": "Veiligheidscoördinator (VGM)", "description": 
+        "Zorgt voor naleving van veiligheids-, gezondheids- en milieuregels."})
+    crud.create_node("role", {"name": "Kwaliteitsinspecteur", "description": 
+        "Controleert of het werk voldoet aan de afgesproken kwaliteitseisen."})
+    crud.create_node("role", {"name": "Opzichter", "description": 
+        "Houdt toezicht namens opdrachtgever op het bouwproces."})
+    crud.create_node("role", {"name": "Beheerder", "description": 
+        "Beheert het onderhoud en de gemeenschappelijke zaken van een wooncomplex."})
+    crud.create_node("role", {"name": "Leverancier", "description": 
+        "Levert materialen en producten die nodig zijn voor de bouw."})
 
-    # # Initiatief
-    # crud.create_relationship("role", "Projectontwikkelaar", "fase", "Initiatief", "WORKS_IN", {})
+    # Initiatief
+    crud.create_relationship("role", "Projectontwikkelaar", "fase", "Initiatief", "WORKS_IN", {})
 
-    # # Haalbaarheid
-    # crud.create_relationship("role", "Projectontwikkelaar", "fase", "Haalbaarheid", "WORKS_IN", {})
-    # crud.create_relationship("role", "Architect", "fase", "Haalbaarheid", "WORKS_IN", {})
+    # Haalbaarheid
+    crud.create_relationship("role", "Projectontwikkelaar", "fase", "Haalbaarheid", "WORKS_IN", {})
+    crud.create_relationship("role", "Architect", "fase", "Haalbaarheid", "WORKS_IN", {})
 
-    # # Ontwerp
-    # crud.create_relationship("role", "Architect", "fase", "Ontwerp", "WORKS_IN", {})
-    # crud.create_relationship("role", "Constructeur", "fase", "Ontwerp", "WORKS_IN", {})
-    # crud.create_relationship("role", "Installateur", "fase", "Ontwerp", "WORKS_IN", {})
-    # crud.create_relationship("role", "Projectontwikkelaar", "fase", "Ontwerp", "WORKS_IN", {})
-    # crud.create_relationship("role", "Gemeente", "fase", "Ontwerp", "WORKS_IN", {})
+    # Ontwerp
+    crud.create_relationship("role", "Architect", "fase", "Ontwerp", "WORKS_IN", {})
+    crud.create_relationship("role", "Constructeur", "fase", "Ontwerp", "WORKS_IN", {})
+    crud.create_relationship("role", "Installateur", "fase", "Ontwerp", "WORKS_IN", {})
+    crud.create_relationship("role", "Projectontwikkelaar", "fase", "Ontwerp", "WORKS_IN", {})
+    crud.create_relationship("role", "Gemeente", "fase", "Ontwerp", "WORKS_IN", {})
 
-    # # Vergunning
-    # crud.create_relationship("role", "Projectontwikkelaar", "fase", "Vergunning", "WORKS_IN", {})
-    # crud.create_relationship("role", "Gemeente", "fase", "Vergunning", "WORKS_IN", {})
-    # crud.create_relationship("role", "Architect", "fase", "Vergunning", "WORKS_IN", {})
+    # Vergunning
+    crud.create_relationship("role", "Projectontwikkelaar", "fase", "Vergunning", "WORKS_IN", {})
+    crud.create_relationship("role", "Gemeente", "fase", "Vergunning", "WORKS_IN", {})
+    crud.create_relationship("role", "Architect", "fase", "Vergunning", "WORKS_IN", {})
 
-    # # Engineering
-    # crud.create_relationship("role", "Aannemer", "fase", "Engineering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Werkvoorbereider", "fase", "Engineering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Inkoopmanager", "fase", "Engineering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Omgevingsmanager", "fase", "Engineering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Projectontwikkelaar", "fase", "Engineering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Leverancier", "fase", "Engineering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Architect", "fase", "Engineering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Constructeur", "fase", "Engineering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Installateur", "fase", "Engineering", "WORKS_IN", {})
+    # Engineering
+    crud.create_relationship("role", "Aannemer", "fase", "Engineering", "WORKS_IN", {})
+    crud.create_relationship("role", "Werkvoorbereider", "fase", "Engineering", "WORKS_IN", {})
+    crud.create_relationship("role", "Inkoopmanager", "fase", "Engineering", "WORKS_IN", {})
+    crud.create_relationship("role", "Omgevingsmanager", "fase", "Engineering", "WORKS_IN", {})
+    crud.create_relationship("role", "Projectontwikkelaar", "fase", "Engineering", "WORKS_IN", {})
+    crud.create_relationship("role", "Leverancier", "fase", "Engineering", "WORKS_IN", {})
+    crud.create_relationship("role", "Architect", "fase", "Engineering", "WORKS_IN", {})
+    crud.create_relationship("role", "Constructeur", "fase", "Engineering", "WORKS_IN", {})
+    crud.create_relationship("role", "Installateur", "fase", "Engineering", "WORKS_IN", {})
     
-    # # Uitvoering
-    # crud.create_relationship("role", "Aannemer", "fase", "Uitvoering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Uitvoerder", "fase", "Uitvoering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Werkvoorbereider", "fase", "Uitvoering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Veiligheidscoördinator (VGM)", "fase", "Uitvoering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Kwaliteitsinspecteur", "fase", "Uitvoering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Opzichter", "fase", "Uitvoering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Installateur", "fase", "Uitvoering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Leverancier", "fase", "Uitvoering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Architect", "fase", "Uitvoering", "WORKS_IN", {})
+    # Uitvoering
+    crud.create_relationship("role", "Aannemer", "fase", "Uitvoering", "WORKS_IN", {})
+    crud.create_relationship("role", "Uitvoerder", "fase", "Uitvoering", "WORKS_IN", {})
+    crud.create_relationship("role", "Werkvoorbereider", "fase", "Uitvoering", "WORKS_IN", {})
+    crud.create_relationship("role", "Veiligheidscoördinator (VGM)", "fase", "Uitvoering", "WORKS_IN", {})
+    crud.create_relationship("role", "Kwaliteitsinspecteur", "fase", "Uitvoering", "WORKS_IN", {})
+    crud.create_relationship("role", "Opzichter", "fase", "Uitvoering", "WORKS_IN", {})
+    crud.create_relationship("role", "Installateur", "fase", "Uitvoering", "WORKS_IN", {})
+    crud.create_relationship("role", "Leverancier", "fase", "Uitvoering", "WORKS_IN", {})
+    crud.create_relationship("role", "Architect", "fase", "Uitvoering", "WORKS_IN", {})
 
-    # # Oplevering
-    # crud.create_relationship("role", "Projectontwikkelaar", "fase", "Oplevering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Bewoner", "fase", "Oplevering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Opzichter", "fase", "Oplevering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Beheerder", "fase", "Oplevering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Kwaliteitsinspecteur", "fase", "Oplevering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Aannemer", "fase", "Oplevering", "WORKS_IN", {})
-    # crud.create_relationship("role", "Uitvoerder", "fase", "Oplevering", "WORKS_IN", {})
+    # Oplevering
+    crud.create_relationship("role", "Projectontwikkelaar", "fase", "Oplevering", "WORKS_IN", {})
+    crud.create_relationship("role", "Bewoner", "fase", "Oplevering", "WORKS_IN", {})
+    crud.create_relationship("role", "Opzichter", "fase", "Oplevering", "WORKS_IN", {})
+    crud.create_relationship("role", "Beheerder", "fase", "Oplevering", "WORKS_IN", {})
+    crud.create_relationship("role", "Kwaliteitsinspecteur", "fase", "Oplevering", "WORKS_IN", {})
+    crud.create_relationship("role", "Aannemer", "fase", "Oplevering", "WORKS_IN", {})
+    crud.create_relationship("role", "Uitvoerder", "fase", "Oplevering", "WORKS_IN", {})
 
-    # # Beheer
-    # crud.create_relationship("role", "Beheerder", "fase", "Beheer", "WORKS_IN", {})
-    # crud.create_relationship("role", "Leverancier", "fase", "Beheer", "WORKS_IN", {})
-    # crud.create_relationship("role", "Bewoner", "fase", "Beheer", "WORKS_IN", {})
+    # Beheer
+    crud.create_relationship("role", "Beheerder", "fase", "Beheer", "WORKS_IN", {})
+    crud.create_relationship("role", "Leverancier", "fase", "Beheer", "WORKS_IN", {})
+    crud.create_relationship("role", "Bewoner", "fase", "Beheer", "WORKS_IN", {})
 
-    # crud.create_node("category", {"name": "Communicatie"})
-    # crud.create_node("category", {"name": "Ontwerp"})
-    # crud.create_node("category", {"name": "Engeneering"})
-    # crud.create_node("category", {"name": "BIM"})
-    # crud.create_node("category", {"name": "Planning"})
-    # crud.create_node("category", {"name": "Calculatie"})
-    # crud.create_node("category", {"name": "Kostenbeheer"})
-    # crud.create_node("category", {"name": "Vergunningen"})
-    # crud.create_node("category", {"name": "GIS"})
-    # crud.create_node("category", {"name": "Logistiek"})
-    # crud.create_node("category", {"name": "Inkoop"})
-    # crud.create_node("category", {"name": "Kwaliteit"})
-    # crud.create_node("category", {"name": "Oplevering"})
-    # crud.create_node("category", {"name": "Onderhoud"})
-    # crud.create_node("category", {"name": "Beheer"})
+    crud.create_node("category", {"name": "Communicatie"})
+    crud.create_node("category", {"name": "Ontwerp"})
+    crud.create_node("category", {"name": "Engeneering"})
+    crud.create_node("category", {"name": "BIM"})
+    crud.create_node("category", {"name": "Planning"})
+    crud.create_node("category", {"name": "Calculatie"})
+    crud.create_node("category", {"name": "Kostenbeheer"})
+    crud.create_node("category", {"name": "Vergunningen"})
+    crud.create_node("category", {"name": "GIS"})
+    crud.create_node("category", {"name": "Logistiek"})
+    crud.create_node("category", {"name": "Inkoop"})
+    crud.create_node("category", {"name": "Kwaliteit"})
+    crud.create_node("category", {"name": "Oplevering"})
+    crud.create_node("category", {"name": "Onderhoud"})
+    crud.create_node("category", {"name": "Beheer"})
 
 
-    # crud.delete_node("software", "Neo4j")
+    crud.delete_node("software", "Neo4j")
