@@ -1,6 +1,8 @@
 import streamlit as st
 from methodes.crud_methodes import GraphCrud
-from methodes.custom_methodes import node_configuration, delete_proceed
+from methodes.custom_methodes import node_configuration
+
+st.set_page_config(layout="centered")
 
 crud = GraphCrud()
 

@@ -3,7 +3,7 @@ from methodes.crud_methodes import GraphCrud
 
 crud = GraphCrud()
 
-#datamodels for each node type
+# datamodels for each node type
 node_configuration = {
     "category": {"name": "str"},
     "company": {"name": "str", "address": "str", "website": "str", "telefoonnummer": "str", "emailaddress":"str", "description": "txt"},
@@ -12,6 +12,7 @@ node_configuration = {
     "software": {"name": "str", "description": "txt", "subscription model": ["Flat rate", "Tiered pricing", "Usage-Based", "Freemium", "Feature-Based"]}
 }
 
+#relation types for graphdb
 relation_configuration = {
     "CREATES": {"node_1": "company", "node_2": "software", "properties": {}},
     "USES": {"node_1": "role", "node_2": "software", "properties": {}},

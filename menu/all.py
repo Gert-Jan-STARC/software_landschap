@@ -2,6 +2,8 @@ import streamlit as st
 from methodes.crud_methodes import GraphCrud
 from methodes.custom_methodes import node_configuration, delete_proceed
 
+st.set_page_config(layout="centered")
+
 crud = GraphCrud()
 if "edit_node" not in st.session_state:
     st.session_state.edit_node = ""
