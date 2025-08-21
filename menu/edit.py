@@ -4,11 +4,21 @@ from methodes.custom_methodes import node_configuration, delete_proceed
 
 crud = GraphCrud()
 
+if "edit_node" not in st.session_state:
+    st.session_state.edit_node = ""
+if "edit_category" not in st.session_state:
+    st.session_state.edit_category = ""
+
 st.subheader("Edit a node here.")
-node_type = st.selectbox("Select node type", node_configuration.keys())
+node_type_list = []
+node_type_list.extend(node_configuration.keys())
+edit_catagory_index = node_type_list.index(st.session_state.edit_category) if st.session_state.edit_category in node_type_list else 0
+node_type = st.selectbox("Select node type", node_type_list, index=edit_catagory_index)
 selected_nodes = crud.get_nodes_by_type(node_type)
-selected_node = st.selectbox("Select existing node", options=selected_nodes)
+edit_node_index = selected_nodes.index(st.session_state.edit_node) if st.session_state.edit_node in selected_nodes else 0
+selected_node = st.selectbox("Select existing node", options=selected_nodes, index=edit_node_index)
 node_properties = crud.read_node_properties_by_name(node_type, selected_node)
+
 
 if node_properties:
     with st.form(f"add_{node_type}_form", clear_on_submit=False):  # don't clear, so edits stay visible

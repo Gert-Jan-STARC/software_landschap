@@ -1,18 +1,8 @@
 import streamlit as st
 from methodes.crud_methodes import GraphCrud
-from methodes.custom_methodes import node_configuration
+from methodes.custom_methodes import node_configuration, delete_proceed
 
 crud = GraphCrud()
-
-# data models for each node type
-# "str" for string input, "txt" for text area, list for selectbox
-node_configuration = {
-    "category": {"name": "str"},
-    "company": {"name": "str", "address": "str", "website": "str", "telefoonnummer": "str", "emailaddress":"str", "description": "txt"},
-    "fase": {"name": "str", "description": "txt"},
-    "role": {"name": "str", "description": "txt"},
-    "software": {"name": "str", "description": "txt", "subscription model": ["Flat rate", "Tiered pricing", "Usage-Based", "Freemium", "Feature-Based"]}
-}
 
 st.subheader("Add a new node here.")
 node_type = st.selectbox("Select node type", node_configuration.keys())
