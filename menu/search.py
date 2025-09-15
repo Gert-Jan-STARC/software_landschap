@@ -7,7 +7,8 @@ crud = get_crud()
 
 st.subheader("Search nodes here.")
 node_type = st.selectbox("Select node type", node_configuration.keys())
-node_result = st.selectbox("Select node type", crud.get_nodes_by_type(node_type))
+options = crud.get_nodes_by_type(node_type)
+node_result = st.selectbox("Select node", options)
 
 st.subheader(f"Search results for {node_type} > {node_result}")
 if node_result:

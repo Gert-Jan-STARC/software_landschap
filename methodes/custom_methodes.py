@@ -15,21 +15,26 @@ def get_crud() -> GraphCrud:
 
 # datamodels for each node type
 node_configuration = {
-    "category": {"name": "str"},
-    "company": {"name": "str", "address": "str", "website": "str", "telefoonnummer": "str", "emailaddress":"str", "description": "txt"},
-    "fase": {"name": "str", "description": "txt"},
-    "role": {"name": "str", "description": "txt"},
-    "software": {"name": "str", "description": "txt"}
+    "business_capability": {"naam": "str", "omschrijving": "txt"},
+    "software_bedrijf": {"naam": "str", "adres": "str", "website": "str", "telefoonnummer": "str", "e-mailadres":"str"},
+    "applicatie": {"naam": "str", "omschrijving": "txt"},
+    "keten_rol": {"naam": "str", "omschrijving": "txt"},
+    "standaard": {"naam": "str", "beheer_organisatie": "str"},
+    "waarde_stroom_fase": {"naam": "str", "omschrijving": "txt"},
+    "waarde_stroom": {"name": "str", "description": "txt"}
 }
 
 #relation types for graphdb
 relation_configuration = {
-    "CREATES": {"node_1": "company", "node_2": "software", "properties": {}},
-    "USES": {"node_1": "role", "node_2": "software", "properties": {}},
-    "HAS": {"node_1": "software", "node_2": "category", "properties": {}},
-    "USED_IN": {"node_1": "software", "node_2": "fase", "properties": {}},
-    "WORKS_IN": {"node_1": "role", "node_2": "fase", "properties": {}},
-    "NEXT": {"node_1": "fase", "node_2": "fase", "properties": {}},
+    "ONDERSTEUNT_BIJ": {"node_1": "applicatie", "node_2": "business_capability", "properties": {}},
+    "GEBRUIKT": {"node_1": "keten_rol", "node_2": "applicatie", "properties": {}},
+    "MAAKT": {"node_1": "software_bedrijf", "node_2": "applicatie", "properties": {}},
+    "MAAKT_GEBRUIKT_VAN": {"node_1": "applicatie", "node_2": "standaard", "properties": {}},
+    "WORDT_GEBRUIKT_IN": {"node_1": "applicatie", "node_2": "waarde_stroom_fase", "properties": {}},
+    "WERKT_IN": {"node_1": "keten_rol", "node_2": "waarde_stroom_fase", "properties": {}},
+    "IS_ONDERDEEL_VAN": {"node_1": "waarde_stroom_fase", "node_2": "waarde_stroom", "properties": {}},
+    "HEEFT": {"node_1": "keten_rol", "node_2": "business_capability", "properties": {}},
+    "IS_NODIG_IN": {"node_1": "business_capability", "node_2": "waarde_stroom_fase", "properties": {}}
 }
 
 def remove_top_margin():

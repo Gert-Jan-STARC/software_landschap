@@ -97,18 +97,23 @@ class GraphCrud:
         If found, updates it. Otherwise, creates a new node.
         Uses MERGE for creation to avoid warnings.
         """
-        if not properties.get('emailaddress') and not properties.get('name'):
-            raise ValueError("At least one of 'emailaddress' or 'name' must be provided for matching.")
+        # Accept either 'naam' (NL) or 'name' (EN), or 'e-mailadres' as key
+        has_naam = properties.get('naam') is not None
+        has_name = properties.get('name') is not None
+        has_email_nl = properties.get('e-mailadres') is not None
+        if not (has_naam or has_name or has_email_nl):
+            raise ValueError("One of 'naam', 'name' or 'e-mailadres' must be provided for matching.")
         with self._driver.session() as session:
             qlabel = self._quote_label(label)
             # Step 1: Check if node with same label + name exists
             existing_node = None
-            if properties.get('name'):
+            if has_naam or has_name:
                 check_query = f"""
-                MATCH (n:{qlabel} {{name: $name}})
+                MATCH (n:{qlabel})
+                WHERE coalesce(n.naam, n.name) = $match_name
                 RETURN elementId(n) AS node_id
                 """
-                existing_node = session.run(check_query, name=properties['name']).single()
+                existing_node = session.run(check_query, match_name=properties.get('naam') or properties.get('name')).single()
             if existing_node:
                 # Step 2: Update existing node
                 update_query = """
@@ -119,14 +124,14 @@ class GraphCrud:
                 result = session.run(update_query, node_id=existing_node['node_id'], props=properties).single()
                 return result["node_id"]
             # Step 3: Create new node using MERGE (prefer emailaddress if available)
-            if properties.get('emailaddress'):
-                merge_key = "emailaddress"
-                merge_value = properties['emailaddress']
+            if has_email_nl:
+                merge_prop = "`e-mailadres`"
+                merge_value = properties['e-mailadres']
             else:
-                merge_key = "name"
-                merge_value = properties['name']
+                merge_prop = "naam" if has_naam else "name"
+                merge_value = properties.get('naam') or properties.get('name')
             create_query = f"""
-            MERGE (n:{qlabel} {{{merge_key}: $merge_value}})
+            MERGE (n:{qlabel} {{{merge_prop}: $merge_value}})
             ON CREATE SET n += $props
             ON MATCH SET n += $props
             RETURN elementId(n) AS node_id
@@ -142,19 +147,20 @@ class GraphCrud:
 
         Returns the new node's elementId when inserted, or None when skipped.
         """
-        name = properties.get('name')
-        if not name:
-            raise ValueError("'name' must be provided for insert_node().")
+        name_value = properties.get('naam') or properties.get('name')
+        if not name_value:
+            raise ValueError("'naam' or 'name' must be provided for insert_node().")
 
         with self._driver.session() as session:
             qlabel = self._quote_label(label)
 
-            # Check if a node with this name already exists
+            # Check if a node with this name already exists (supports NL/EN)
             check_query = f"""
-            MATCH (n:{qlabel} {{name: $name}})
+            MATCH (n:{qlabel})
+            WHERE coalesce(n.naam, n.name) = $name_value
             RETURN elementId(n) AS node_id
             """
-            existing = session.run(check_query, name=name).single()
+            existing = session.run(check_query, name_value=name_value).single()
             if existing:
                 return None  # Skip insert
 
@@ -173,7 +179,9 @@ class GraphCrud:
             qlabel = self._quote_label(node_type)
             query = f"""
             MATCH (n:{qlabel})
-            RETURN DISTINCT n.name AS name
+            WITH coalesce(n.naam, n.name) AS naam
+            WHERE naam IS NOT NULL
+            RETURN DISTINCT naam AS name
             ORDER BY name
             """
             result = session.run(query)
@@ -189,7 +197,7 @@ class GraphCrud:
             qlabel = self._quote_label(label)
             query = (
                 f"MATCH (n:{qlabel}) "
-                f"WHERE n.name = $name "
+                f"WHERE coalesce(n.naam, n.name) = $name "
                 f"RETURN properties(n) AS props"
             )
             result = session.run(query, name=name).single()
@@ -206,7 +214,7 @@ class GraphCrud:
         with self._driver.session() as session:
             qlabel = self._quote_label(label)
             # Use summary counters to reliably detect deletions
-            query = f"MATCH (n:{qlabel} {{name: $name}}) DETACH DELETE n"
+            query = f"MATCH (n:{qlabel}) WHERE coalesce(n.naam, n.name) = $name DETACH DELETE n"
             result = session.run(query, name=name)
             summary = result.consume()
             return getattr(summary.counters, 'nodes_deleted', 0) > 0
@@ -231,15 +239,17 @@ class GraphCrud:
 
             # Outgoing
             out_query = (
-                f"MATCH (n:{qlabel} {{name: $name}})-[r]->(m) "
+                f"MATCH (n:{qlabel}) WHERE coalesce(n.naam, n.name) = $name "
+                f"MATCH (n)-[r]->(m) "
                 f"RETURN type(r) AS type, 'out' AS dir, elementId(m) AS other_id, "
-                f"labels(m) AS other_labels, m.name AS other_name, properties(r) AS rel_props"
+                f"labels(m) AS other_labels, coalesce(m.naam, m.name) AS other_name, properties(r) AS rel_props"
             )
             # Incoming
             in_query = (
-                f"MATCH (m)-[r]->(n:{qlabel} {{name: $name}}) "
+                f"MATCH (n:{qlabel}) WHERE coalesce(n.naam, n.name) = $name "
+                f"MATCH (m)-[r]->(n) "
                 f"RETURN type(r) AS type, 'in' AS dir, elementId(m) AS other_id, "
-                f"labels(m) AS other_labels, m.name AS other_name, properties(r) AS rel_props"
+                f"labels(m) AS other_labels, coalesce(m.naam, m.name) AS other_name, properties(r) AS rel_props"
             )
 
             for q in (out_query, in_query):
@@ -311,8 +321,8 @@ class GraphCrud:
             b = self._quote_label(end_label)
             r = self._quote_reltype(relationship_type)
             query = (
-                f"MATCH (a:{a} {{name: $start_name}}), "
-                f"(b:{b} {{name: $end_name}}) "
+                f"MATCH (a:{a}), (b:{b}) "
+                f"WHERE coalesce(a.naam, a.name) = $start_name AND coalesce(b.naam, b.name) = $end_name "
                 f"MERGE (a)-[r:{r}]->(b) "
                 f"SET r += $properties "
                 f"RETURN elementId(r) AS rel_id"

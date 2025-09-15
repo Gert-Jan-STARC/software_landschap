@@ -3,12 +3,6 @@ from methodes.custom_methodes import node_configuration, get_crud
 
 st.set_page_config(layout="centered")
 
-# Ensure we don't keep an outdated cached GraphCrud after code changes
-try:
-    st.cache_resource.clear()
-except Exception:
-    pass
-
 crud = get_crud()
 
 st.subheader("Add a new node here.")
@@ -49,3 +43,4 @@ if node_type != "":
                     st.stop()
             else:
                 st.error("Please fill in all required text fields: " + ", ".join(node_configuration[node_type].keys()))
+

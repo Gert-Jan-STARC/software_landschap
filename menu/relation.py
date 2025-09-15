@@ -7,7 +7,7 @@ crud = get_crud()
 
 st.subheader("Add a new relation here.")
 relation_type = st.selectbox("Select relation type", relation_configuration.keys())
-st.write(f"{relation_configuration[relation_type]["node_1"]} > {relation_type} > {relation_configuration[relation_type]["node_2"]}")
+st.write(f"{relation_configuration[relation_type]['node_1']} > {relation_type} > {relation_configuration[relation_type]['node_2']}")
 if relation_type != "":
     with st.form(f"add_{relation_type}_form", clear_on_submit=True):
         st.subheader(f"Add a new {relation_type} relation")
@@ -49,3 +49,4 @@ if relation_type != "":
                 st.success(f"{node_1} > {relation_type} > {node_2} added successfully!")
             else:
                 st.error("Please select both nodes for the relation.")
+

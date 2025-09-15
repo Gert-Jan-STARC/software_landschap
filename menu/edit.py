@@ -11,8 +11,7 @@ if "edit_category" not in st.session_state:
     st.session_state.edit_category = ""
 
 st.subheader("Edit a node here.")
-node_type_list = []
-node_type_list.extend(node_configuration.keys())
+node_type_list = list(node_configuration.keys())
 edit_catagory_index = node_type_list.index(st.session_state.edit_category) if st.session_state.edit_category in node_type_list else 0
 node_type = st.selectbox("Select node type", node_type_list, index=edit_catagory_index)
 
@@ -30,7 +29,7 @@ if node_properties:
         for key, value in node_configuration[node_type].items():
             current_val = node_properties.get(key, "")  # default to "" if property not found
 
-            if key == "name":
+            if key in ("naam", "name"):
                 name = st.text_input(key, value=current_val, key=f"{node_type}_{key}", disabled=True)
                 continue
 
@@ -63,5 +62,5 @@ if node_properties:
     #delete node
     deleted = st.button(f"Delete {node_type}: {name}", use_container_width=True, type="secondary", icon="🗑️")
     if deleted:
-        delete_proceed(node_type, "name", name)
+        delete_proceed(node_type, "naam", name)
 

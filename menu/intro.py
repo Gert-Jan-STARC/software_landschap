@@ -1,7 +1,7 @@
 import streamlit as st
 from methodes.custom_methodes import get_crud
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="centered")
 
 crud = get_crud()
 
@@ -31,9 +31,9 @@ db_error = False
 def load_dashboard_metrics():
     c = get_crud()
     return {
-        "software": c.count_nodes("software"),
-        "company": c.count_nodes("company"),
-        "role": c.count_nodes("role"),
+        "applicatie": c.count_nodes("applicatie"),
+        "software_bedrijf": c.count_nodes("software_bedrijf"),
+        "keten_rol": c.count_nodes("keten_rol"),
         "nodes": c.total_nodes(),
         "rels": c.total_relationships(),
     }
@@ -41,9 +41,9 @@ def load_dashboard_metrics():
 try:
     with st.spinner("Loading dashboard metrics..."):
         metrics = load_dashboard_metrics()
-        software_count = metrics["software"]
-        company_count = metrics["company"]
-        role_count = metrics["role"]
+        software_count = metrics["applicatie"]
+        company_count = metrics["software_bedrijf"]
+        role_count = metrics["keten_rol"]
         total_nodes = metrics["nodes"]
         total_rels = metrics["rels"]
 except Exception:
