@@ -1,10 +1,9 @@
 import streamlit as st
-from methodes.crud_methodes import GraphCrud
-from methodes.custom_methodes import relation_configuration
+from methodes.custom_methodes import relation_configuration, get_crud
 
 st.set_page_config(layout="centered")
 
-crud = GraphCrud()
+crud = get_crud()
 
 st.subheader("Add a new relation here.")
 relation_type = st.selectbox("Select relation type", relation_configuration.keys())
@@ -17,9 +16,8 @@ if relation_type != "":
         node_1_type = relation_configuration[relation_type]["node_1"]
         node_2_type = relation_configuration[relation_type]["node_2"]
 
-        # Get existing nodes for each type
-        node_1_options = crud.get_nodes_by_type(node_1_type)
-        node_2_options = crud.get_nodes_by_type(node_2_type)
+        node_1_options = list(crud.get_nodes_by_type(node_1_type))
+        node_2_options = list(crud.get_nodes_by_type(node_2_type))
 
         # Select nodes for the relation
         node_1 = st.selectbox(f"Select {node_1_type}", options=node_1_options, key=f"{relation_type}_node_1")
@@ -48,6 +46,6 @@ if relation_type != "":
                     relationship_type=relation_type,
                     properties={prop: st.session_state.get(f"{relation_type}_{prop}", "") for prop in properties}
                 )
-                st.success(f"{relation_type} added successfully!")
+                st.success(f"{node_1} > {relation_type} > {node_2} added successfully!")
             else:
                 st.error("Please select both nodes for the relation.")

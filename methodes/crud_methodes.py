@@ -2,8 +2,16 @@ from neo4j import GraphDatabase
 from dotenv import load_dotenv
 load_dotenv()
 import os
+import re
+from typing import Any, Dict, List, Optional
 
 class GraphCrud:
+    """Thin convenience wrapper around the Neo4j Python driver.
+
+    Reads connection settings from environment and offers small helpers for
+    common CRUD and aggregation operations used by the app.
+    """
+
     def __init__(self):
         """Initialize the Neo4j driver using environment variables."""
         uri = os.getenv("NEO4J_URI")
@@ -17,22 +25,72 @@ class GraphCrud:
         if not password:
             raise ValueError("Environment variable NEO4J_PASSWORD is not set.")
 
-        self._driver = GraphDatabase.driver(uri, auth=(username, password))
+        # Optional tuning via env
+        def _int_env(name: str, default: int) -> int:
+            try:
+                return int(os.getenv(name, default))
+            except Exception:
+                return default
+
+        pool_size = _int_env("NEO4J_MAX_POOL_SIZE", 100)
+        conn_timeout = _int_env("NEO4J_CONNECTION_TIMEOUT", 30)
+        max_lifetime = _int_env("NEO4J_MAX_CONN_LIFETIME", 3600)
+
+        self._driver = GraphDatabase.driver(
+            uri,
+            auth=(username, password),
+            max_connection_pool_size=pool_size,
+            connection_timeout=conn_timeout,
+            max_connection_lifetime=max_lifetime,
+        )
+
+    # ---------- driver lifecycle ----------
 
     def close(self):
         """Close the Neo4j driver connection."""
         self._driver.close()
 
+    def is_alive(self) -> bool:
+        """Simple connectivity check against the database."""
+        try:
+            with self._driver.session() as session:
+                res = session.run("RETURN 1 AS ok").single()
+                return bool(res and res["ok"] == 1)
+        except Exception:
+            return False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+
+    # ---------- internal helpers ----------
+    @staticmethod
+    def _quote_label(label: str) -> str:
+        """Validate and quote a label for Cypher to avoid injection/typos."""
+        s = label.strip() if isinstance(label, str) else ""
+        if not s or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", s):
+            raise ValueError(f"Invalid label name: {label!r}")
+        return f"`{s}`"
+
+    @staticmethod
+    def _quote_reltype(rel_type: str) -> str:
+        s = rel_type.strip() if isinstance(rel_type, str) else ""
+        if not s or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", s):
+            raise ValueError(f"Invalid relationship type: {rel_type!r}")
+        return f"`{s}`"
+
     # ==========================
     # Node CRUD Operations
     # ==========================
 
-    def clear_database(self):
+    def clear_database(self) -> None:
         """Delete all nodes and relationships in the database."""
         with self._driver.session() as session:
             session.run("MATCH (n) DETACH DELETE n")
 
-    def create_node(self, label, properties):
+    def create_node(self, label: str, properties: Dict[str, Any]) -> Optional[str]:
         """
         Create or update a node with the given label.
         First tries to find an existing node by label + name.
@@ -41,17 +99,16 @@ class GraphCrud:
         """
         if not properties.get('emailaddress') and not properties.get('name'):
             raise ValueError("At least one of 'emailaddress' or 'name' must be provided for matching.")
-
         with self._driver.session() as session:
+            qlabel = self._quote_label(label)
             # Step 1: Check if node with same label + name exists
             existing_node = None
             if properties.get('name'):
                 check_query = f"""
-                MATCH (n:{label} {{name: $name}})
+                MATCH (n:{qlabel} {{name: $name}})
                 RETURN elementId(n) AS node_id
                 """
                 existing_node = session.run(check_query, name=properties['name']).single()
-
             if existing_node:
                 # Step 2: Update existing node
                 update_query = """
@@ -61,7 +118,6 @@ class GraphCrud:
                 """
                 result = session.run(update_query, node_id=existing_node['node_id'], props=properties).single()
                 return result["node_id"]
-
             # Step 3: Create new node using MERGE (prefer emailaddress if available)
             if properties.get('emailaddress'):
                 merge_key = "emailaddress"
@@ -69,9 +125,8 @@ class GraphCrud:
             else:
                 merge_key = "name"
                 merge_value = properties['name']
-
             create_query = f"""
-            MERGE (n:{label} {{{merge_key}: $merge_value}})
+            MERGE (n:{qlabel} {{{merge_key}: $merge_value}})
             ON CREATE SET n += $props
             ON MATCH SET n += $props
             RETURN elementId(n) AS node_id
@@ -79,11 +134,45 @@ class GraphCrud:
             result = session.run(create_query, merge_value=merge_value, props=properties).single()
             return result["node_id"]
 
-    def get_nodes_by_type(self, node_type):
+    def insert_node(self, label: str, properties: Dict[str, Any]) -> Optional[str]:
+        """
+        Insert-only variant: creates a new node if and only if no node with
+        the same label and 'name' exists. If one exists, do nothing and
+        return None.
+
+        Returns the new node's elementId when inserted, or None when skipped.
+        """
+        name = properties.get('name')
+        if not name:
+            raise ValueError("'name' must be provided for insert_node().")
+
+        with self._driver.session() as session:
+            qlabel = self._quote_label(label)
+
+            # Check if a node with this name already exists
+            check_query = f"""
+            MATCH (n:{qlabel} {{name: $name}})
+            RETURN elementId(n) AS node_id
+            """
+            existing = session.run(check_query, name=name).single()
+            if existing:
+                return None  # Skip insert
+
+            # Create fresh node
+            create_query = f"""
+            CREATE (n:{qlabel})
+            SET n += $props
+            RETURN elementId(n) AS node_id
+            """
+            result = session.run(create_query, props=properties).single()
+            return result["node_id"] if result else None
+    
+    def get_nodes_by_type(self, node_type: str) -> List[str]:
         nodes = set()
         with self._driver.session() as session:
+            qlabel = self._quote_label(node_type)
             query = f"""
-            MATCH (n:`{node_type}`)
+            MATCH (n:{qlabel})
             RETURN DISTINCT n.name AS name
             ORDER BY name
             """
@@ -94,18 +183,19 @@ class GraphCrud:
 
         return sorted(list(nodes))
     
-    def read_node_properties_by_name(self, label, name):
+    def read_node_properties_by_name(self, label: str, name: str) -> Optional[Dict[str, Any]]:
         """Read properties of a node based on its label and name."""
         with self._driver.session() as session:
+            qlabel = self._quote_label(label)
             query = (
-                f"MATCH (n:{label}) "
+                f"MATCH (n:{qlabel}) "
                 f"WHERE n.name = $name "
                 f"RETURN properties(n) AS props"
             )
             result = session.run(query, name=name).single()
             return result['props'] if result else None
         
-    def delete_node(self, label, name):
+    def delete_node(self, label: str, name: str) -> bool:
         """
         Delete a node by its label and name property.
         Returns True if a node was deleted, False if none matched.
@@ -114,21 +204,71 @@ class GraphCrud:
             raise ValueError("'name' must be provided to delete a node.")
 
         with self._driver.session() as session:
-            query = f"""
-            MATCH (n:{label} {{name: $name}})
-            DETACH DELETE n
-            RETURN COUNT(n) AS deleted_count
-            """
-            result = session.run(query, name=name).single()
-            return result["deleted_count"] > 0
+            qlabel = self._quote_label(label)
+            # Use summary counters to reliably detect deletions
+            query = f"MATCH (n:{qlabel} {{name: $name}}) DETACH DELETE n"
+            result = session.run(query, name=name)
+            summary = result.consume()
+            return getattr(summary.counters, 'nodes_deleted', 0) > 0
         
-    def create_relation_by_name(self, start_label, start_name, end_label, end_name, relationship_type, properties=None): 
+    # ==========================
+    # Aggregations / Counts
+    # ==========================
+
+    def count_nodes(self, label: str) -> int:
+        """Return the number of nodes with the given label."""
+        with self._driver.session() as session:
+            query = f"MATCH (n:{self._quote_label(label)}) RETURN count(n) AS c"
+            result = session.run(query).single()
+            return int(result["c"]) if result else 0
+
+    def total_nodes(self) -> int:
+        """Return the total number of nodes in the database."""
+        with self._driver.session() as session:
+            result = session.run("MATCH (n) RETURN count(n) AS c").single()
+            return int(result["c"]) if result else 0
+
+    def count_relationships(self, rel_type: str) -> int:
+        """Return the number of relationships of a given type."""
+        with self._driver.session() as session:
+            query = f"MATCH ()-[r:{self._quote_reltype(rel_type)}]-() RETURN count(r) AS c"
+            result = session.run(query).single()
+            return int(result["c"]) if result else 0
+
+    def total_relationships(self) -> int:
+        """Return the total number of relationships in the database."""
+        with self._driver.session() as session:
+            result = session.run("MATCH ()-[r]-() RETURN count(r) AS c").single()
+            return int(result["c"]) if result else 0
+
+    def counts_by_labels(self, labels: List[str]) -> Dict[str, int]:
+        """Return a dict of label -> count for the provided labels."""
+        counts: Dict[str, int] = {}
+        for label in labels:
+            try:
+                counts[label] = self.count_nodes(label)
+            except Exception:
+                counts[label] = 0
+        return counts
+        
+    def create_relation_by_name(
+        self,
+        start_label: str,
+        start_name: str,
+        end_label: str,
+        end_name: str,
+        relationship_type: str,
+        properties: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
         """Create a relationship between two nodes identified by name."""
         with self._driver.session() as session:
+            a = self._quote_label(start_label)
+            b = self._quote_label(end_label)
+            r = self._quote_reltype(relationship_type)
             query = (
-                f"MATCH (a:{start_label} {{name: $start_name}}), "
-                f"(b:{end_label} {{name: $end_name}}) "
-                f"MERGE (a)-[r:{relationship_type}]->(b) "
+                f"MATCH (a:{a} {{name: $start_name}}), "
+                f"(b:{b} {{name: $end_name}}) "
+                f"MERGE (a)-[r:{r}]->(b) "
                 f"SET r += $properties "
                 f"RETURN elementId(r) AS rel_id"
             )
@@ -145,162 +285,173 @@ class GraphCrud:
 if __name__ == "__main__":
     # Example usage
     crud = GraphCrud()
-    crud.clear_database()
-    crud.create_node("fase", {"name": "Initiatief", "description": 
-    "Wat gebeurt er? Eerste idee of behoefte aan woningen (door gemeente, ontwikkelaar, corporatie of particulier). "
-    "Globale verkenning van de locatie, haalbaarheid en doelgroepen. "
-    "Belangrijke activiteiten: Locatieonderzoek (bestemmingsplan, eigendom, omgevingsfactoren). Marktanalyse en indicatie "
-    "van kosten/baten. Globaal programma van eisen (hoeveel woningen, type, duurzaamheid)."})
-
-    crud.create_node("fase", {"name": "Haalbaarheid", "description": 
-    "Wat gebeurt er? Uitwerken van een eerste ontwerpconcept en kostenraming. Toetsen of het plan financieel, technisch, "
-    "juridisch en maatschappelijk haalbaar is. "
-    "Belangrijke activiteiten: Stedenbouwkundig schetsontwerp. Overleg met gemeente en andere stakeholders. "
-    "Eventuele participatie met omwonenden. Risicoanalyse. Opstellen businesscase."})
-
-    crud.create_node("fase", {"name": "Ontwerp", "description": 
-    "Wat gebeurt er? Van schetsontwerp naar definitief ontwerp. "
-    "Belangrijke activiteiten: Schetsontwerp (SO) ruimtelijke opzet, massa en situering. "
-    "Voorlopig Ontwerp (VO): materialen, plattegronden, gevels. Definitief Ontwerp (DO): alle details, constructies en installaties uitgewerkt. "
-    "Duurzaamheids- en energieconcept."})
-
-    crud.create_node("fase", {"name": "Vergunning", "description": 
-    "Wat gebeurt er? Aanvragen van de Omgevingsvergunning (bouw, milieu, eventueel sloop). "
-    "Plan wordt formeel getoetst aan het bestemmingsplan, bouwbesluit, welstand. "
-    "Belangrijke activiteiten: Indienen complete aanvraag bij de gemeente. Eventuele bezwaarprocedures door derden. Definitieve goedkeuring verkrijgen."})
-
-    crud.create_node("fase", {"name": "Engineering", "description": 
-    "Wat gebeurt er? Selecteren van aannemer (aanbesteding of onderhandse gunning). Opstellen contracten. "
-    "Belangrijke activiteiten: Werkvoorbereiding door de aannemer (uitvoeringsplannen, inkoop materialen). "
-    "Eventueel bouwrijp maken van de grond (nutsvoorzieningen, infrastructuur)."})
-
-    crud.create_node("fase", {"name": "Uitvoering", "description": 
-    "Wat gebeurt er? Fysieke bouw van de woningen. "
-    "Belangrijke activiteiten: Grondwerk, fundering, ruwbouw, afbouw. Kwaliteitscontroles en bouwtoezicht. "
-    "Eventuele aanpassingen tijdens de bouw."})
-
-    crud.create_node("fase", {"name": "Oplevering", "description": 
-    "Wat gebeurt er? Officiële overdracht van woningen aan kopers/huurders. "
-    "Belangrijke activiteiten: Eindinspectie en opleverrapport. Verhelpen van opleverpunten. Overdracht documentatie (garanties, handleidingen)."})
-
-    crud.create_node("fase", {"name": "Beheer", "description": 
-    "Wat gebeurt er? Ondersteuning bewoners bij gebreken. Eventuele garantieclaims. "
-    "Belangrijke activiteiten: Nazorgperiode (meestal 3–6 maanden of 1 jaar). Overdracht aan VvE of beheerorganisatie."})
-
-    crud.create_relation_by_name("fase", "Initiatief", "fase", "Haalbaarheid", "NEXT", {} )
-    crud.create_relation_by_name("fase", "Haalbaarheid", "fase", "Ontwerp", "NEXT", {})
-    crud.create_relation_by_name("fase", "Ontwerp", "fase", "Vergunning", "NEXT", {})
-    crud.create_relation_by_name("fase", "Vergunning", "fase", "Engineering", "NEXT ", {})
-    crud.create_relation_by_name("fase", "Engineering", "fase", "Uitvoering", "NEXT", {})
-    crud.create_relation_by_name("fase", "Uitvoering", "fase", "Oplevering", "NEXT", {})
-    crud.create_relation_by_name("fase", "Oplevering", "fase", "Beheer", "NEXT", {})
-
-    crud.create_node("role", {"name": "Projectontwikkelaar", "description": 
-        "Coördineert en ontwikkelt het bouwproject van initiatief tot oplevering."})
-    crud.create_node("role", {"name": "Gemeente", "description":
-        "Toezichthouder en vergunningverlener namens de overheid."})
-    crud.create_node("role", {"name": "Stedenbouwkundige", "description": 
-        "Ontwerpt de ruimtelijke opzet van een gebied, inclusief infrastructuur en inrichting."})
-    crud.create_node("role", {"name": "Architect", "description": 
-        "Maakt het ontwerp van de woning en de uitstraling ervan."})
-    crud.create_node("role", {"name": "Constructeur", "description": 
-        "Zorgt dat het ontwerp technisch veilig en uitvoerbaar is."})
-    crud.create_node("role", {"name": "Installateur", "description": 
-        "Ontwerpt technische installaties zoals verwarming, ventilatie en elektra."})
-    crud.create_node("role", {"name": "Inkoopmanager", "description": 
-        "Regelt de inkoop van materialen en diensten voor het project."})
-    crud.create_node("role", {"name": "Omgevingsmanager", "description": 
-        "Beheert communicatie en belangen van omwonenden en stakeholders."})
-    crud.create_node("role", {"name": "Aannemer", "description": 
-        "Voert de bouw uit en draagt zorg voor het bouwproces."})
-    crud.create_node("role", {"name": "Werkvoorbereider", "description": 
-        "Bereidt de uitvoering voor, regelt planning, materialen en logistiek."})
-    crud.create_node("role", {"name": "Uitvoerder", "description": 
-        "Toezicht op de dagelijkse gang van zaken op de bouwplaats."})
-    crud.create_node("role", {"name": "Veiligheidscoördinator (VGM)", "description": 
-        "Zorgt voor naleving van veiligheids-, gezondheids- en milieuregels."})
-    crud.create_node("role", {"name": "Kwaliteitsinspecteur", "description": 
-        "Controleert of het werk voldoet aan de afgesproken kwaliteitseisen."})
-    crud.create_node("role", {"name": "Opzichter", "description": 
-        "Houdt toezicht namens opdrachtgever op het bouwproces."})
-    crud.create_node("role", {"name": "Beheerder", "description": 
-        "Beheert het onderhoud en de gemeenschappelijke zaken van een wooncomplex."})
-    crud.create_node("role", {"name": "Leverancier", "description": 
-        "Levert materialen en producten die nodig zijn voor de bouw."})
-
-    # Initiatief
-    crud.create_relation_by_name("role", "Projectontwikkelaar", "fase", "Initiatief", "WORKS_IN", {})
-
-    # Haalbaarheid
-    crud.create_relation_by_name("role", "Projectontwikkelaar", "fase", "Haalbaarheid", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Architect", "fase", "Haalbaarheid", "WORKS_IN", {})
-
-    # Ontwerp
-    crud.create_relation_by_name("role", "Architect", "fase", "Ontwerp", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Constructeur", "fase", "Ontwerp", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Installateur", "fase", "Ontwerp", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Projectontwikkelaar", "fase", "Ontwerp", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Gemeente", "fase", "Ontwerp", "WORKS_IN", {})
-
-    # Vergunning
-    crud.create_relation_by_name("role", "Projectontwikkelaar", "fase", "Vergunning", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Gemeente", "fase", "Vergunning", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Architect", "fase", "Vergunning", "WORKS_IN", {})
-
-    # Engineering
-    crud.create_relation_by_name("role", "Aannemer", "fase", "Engineering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Werkvoorbereider", "fase", "Engineering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Inkoopmanager", "fase", "Engineering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Omgevingsmanager", "fase", "Engineering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Projectontwikkelaar", "fase", "Engineering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Leverancier", "fase", "Engineering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Architect", "fase", "Engineering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Constructeur", "fase", "Engineering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Installateur", "fase", "Engineering", "WORKS_IN", {})
     
-    # Uitvoering
-    crud.create_relation_by_name("role", "Aannemer", "fase", "Uitvoering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Uitvoerder", "fase", "Uitvoering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Werkvoorbereider", "fase", "Uitvoering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Veiligheidscoördinator (VGM)", "fase", "Uitvoering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Kwaliteitsinspecteur", "fase", "Uitvoering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Opzichter", "fase", "Uitvoering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Installateur", "fase", "Uitvoering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Leverancier", "fase", "Uitvoering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Architect", "fase", "Uitvoering", "WORKS_IN", {})
+    crud.insert_node("company", {"name": "Autodesk", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Graphisoft", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Trimble", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Solibri", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "KUBUS", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Dalux", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "PlanRadar", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "KYP", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Bluebeam", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "SCIA", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "MagiCAD Group", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Elecosoft", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Ed Controls", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Pro4all (Snagstream)", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Asite", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Catenda", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Thinkproject", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Oracle (Aconex)", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Bentley Systems", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Bricsys", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Vectorworks (Design Express)", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "simplebim", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Revizto", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "BIM Track", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Cadac Group", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Zutec", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "IDEA StatiCa", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Arkance systems", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Planon", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Neanex", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Brink software", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Allplan", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Dassault Systems", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Esri", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Jedox", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Kadaster", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Move3 software", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Unity  Technologies", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Arkance Systems NL", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Weaver B.V.", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Bimforce", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Neanex", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Linear GMBH", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "ISD Group", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Arkey Systems", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "2Jours B.V", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "De twee snoeken", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "EZ-base BV", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Squadra", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "ZeeBoer", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Masters in Process B.V.", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Spacewell", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Cleverstone", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "RadarAdvies", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "XSARUS", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Blender Foundation", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "Open Design Alliance", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "VIKTOR", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "McNeel", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("company", {"name": "DAQS", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
 
-    # Oplevering
-    crud.create_relation_by_name("role", "Projectontwikkelaar", "fase", "Oplevering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Bewoner", "fase", "Oplevering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Opzichter", "fase", "Oplevering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Beheerder", "fase", "Oplevering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Kwaliteitsinspecteur", "fase", "Oplevering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Aannemer", "fase", "Oplevering", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Uitvoerder", "fase", "Oplevering", "WORKS_IN", {})
-
-    # Beheer
-    crud.create_relation_by_name("role", "Beheerder", "fase", "Beheer", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Leverancier", "fase", "Beheer", "WORKS_IN", {})
-    crud.create_relation_by_name("role", "Bewoner", "fase", "Beheer", "WORKS_IN", {})
-
-    crud.create_node("category", {"name": "Communicatie"})
-    crud.create_node("category", {"name": "Ontwerp"})
-    crud.create_node("category", {"name": "Engeneering"})
-    crud.create_node("category", {"name": "BIM"})
-    crud.create_node("category", {"name": "Planning"})
-    crud.create_node("category", {"name": "Calculatie"})
-    crud.create_node("category", {"name": "Kostenbeheer"})
-    crud.create_node("category", {"name": "Vergunningen"})
-    crud.create_node("category", {"name": "GIS"})
-    crud.create_node("category", {"name": "Logistiek"})
-    crud.create_node("category", {"name": "Inkoop"})
-    crud.create_node("category", {"name": "Kwaliteit"})
-    crud.create_node("category", {"name": "Oplevering"})
-    crud.create_node("category", {"name": "Onderhoud"})
-    crud.create_node("category", {"name": "Beheer"})
-
-    crud.create_node("software", {"name": "Revit", "description": "BIM software voor architecten en ingenieurs.", "subscription model": "Tiered pricing"})
-    crud.create_node("company", {"name": "Autodesk", "address": "111 McInnis Parkway, San Rafael, CA 94903, USA", "website": "https://www.autodesk.com", "telefoonnummer": "+1 800-964-6432", "emailaddress": "info@autodesk.com", "description": "Autodesk is a software company that makes software for architecture, engineering, construction, manufacturing, media, and entertainment industries."})
-
-
-    crud.delete_node("software", "Neo4j")
+    crud.insert_node("software", {"name": "Construction Cloud (ACC)", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Trimble Connect", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Asite CDE", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Catenda Hub (Bimsync)", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Thinkproject CDE", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Oracle Aconex", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Bentley ProjectWise", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Bricsys 24/7", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "TheModus Suite", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Cadac Organice", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "BIMcollab Cloud", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "BIMcollab ZOOM", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Solibri Office", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Navisworks", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Revizto", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "BIM Track", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "simplebim", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Dalux Field/Box", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "PlanRadar", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Ed Controls", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Snagstream", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Bluebeam Revu/Cloud", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Zutec Handover", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Powerproject", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "KYP Project", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "IBIS-TRAD", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Autodesk Revit", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Archicad", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Tekla Structures", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Vectorworks Architect", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "BricsCAD BIM", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "OpenBuildings Designer", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "DDScad", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Stabicad", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "MagiCAD", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "SCIA Engineer", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "IDEA StatiCa", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Solibri Anywhere", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Dalux BIM Viewer", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Jedox", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "SmartTeam", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Quintiq", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "AutoCAD", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "ArcGIS", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Civil 3D", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Solidworks", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "DuboCalc", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Sketchup", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Klic App", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Synchro4D", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Primavera P6", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Tilos", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "MathCAD", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Ibis", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Planon IWMS", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Horizons", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Vault", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "StabiCAD", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Unity Virtual Reality", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Solibri model viewer", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "InfraCAD", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Vabi EPA-U / BIM  / Elements", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "DGMR / Bink", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Weaver CMDB", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Humble MJOP", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "EDcontrol", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "TiQiT", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Project wise", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Vertex", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Real estate RE suite", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Powerproject", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Neanex", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Linear", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "KUBUS spexx", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Infraworks", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Ibis4projects", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "HiCad", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "BricsCad", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Catenda Hub", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "BIMcollab", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "BIM-meetstaten", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Asite", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Areddo", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Adomi", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Advance", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "12Build", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "2Jours", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Calago", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Bouwconnekt / 2 snoeken", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "EZ-base", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "MatrixFrame", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Squadra", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Utopis PIM", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "BIMlink", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Ilips", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Spacewell Axxerion", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "GRIP", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Gebouw365 - Radar advies", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Briefbuilder", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Xsarus", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "IFC viewer", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Oracle Aconex", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Allplan", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "BIMcollab Zoom", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "OMRT", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Viktor", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "Grasshopper", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})
+    crud.insert_node("software", {"name": "DAQS.io", "address": "test", "website": "test", "telefoonnummer": "test", "emailaddress": "test", "description": "test"})

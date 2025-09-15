@@ -1,10 +1,9 @@
 import streamlit as st
-from methodes.crud_methodes import GraphCrud
-from methodes.custom_methodes import node_configuration, delete_proceed
+from methodes.custom_methodes import node_configuration, delete_proceed, get_crud
 
 st.set_page_config(layout="centered")
 
-crud = GraphCrud()
+crud = get_crud()
 
 if "edit_node" not in st.session_state:
     st.session_state.edit_node = ""
@@ -16,9 +15,10 @@ node_type_list = []
 node_type_list.extend(node_configuration.keys())
 edit_catagory_index = node_type_list.index(st.session_state.edit_category) if st.session_state.edit_category in node_type_list else 0
 node_type = st.selectbox("Select node type", node_type_list, index=edit_catagory_index)
+
 selected_nodes = crud.get_nodes_by_type(node_type)
 edit_node_index = selected_nodes.index(st.session_state.edit_node) if st.session_state.edit_node in selected_nodes else 0
-selected_node = st.selectbox("Select existing node", options=selected_nodes, index=edit_node_index)
+selected_node = st.selectbox("Select existing node", options=selected_nodes, index=edit_node_index, key=f"existing_node_{node_type}")
 node_properties = crud.read_node_properties_by_name(node_type, selected_node)
 
 
@@ -53,6 +53,10 @@ if node_properties:
             if all(updated_properties.values()):
                 crud.create_node(node_type, updated_properties)
                 st.success(f"{node_type} updated successfully!")
+                try:
+                    st.cache_data.clear()
+                except Exception:
+                    pass
             else:
                 st.error("Please fill in all required text fields: " + ", ".join(node_configuration[node_type].keys()))
         
