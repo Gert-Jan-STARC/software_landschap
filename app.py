@@ -7,7 +7,9 @@ st.set_page_config(layout="centered")
 st.logo(image="images/logo.png", link="https://www.digigo.nu", size="medium")
 
 pages = {
-    "Home": [st.Page("menu/intro.py", title="Home", icon="🏠")],
+    "Home": [
+        st.Page("menu/intro.py", title="Home", icon="🏠"),
+        st.Page("menu/search.py", title="Search nodes", icon="🔍"),],
     "CRUD": [
         st.Page("menu/all.py", title="All nodes", icon="📋"),
         st.Page("menu/add.py", title="Add node", icon="➕"),

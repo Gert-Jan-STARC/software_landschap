@@ -2,10 +2,16 @@ import streamlit as st
 from methodes.crud_methodes import GraphCrud
 
 # Provide a single, cached GraphCrud instance across reruns to avoid
-# repeatedly reconnecting to Neo4j.
+# repeatedly reconnecting to Neo4j. Use a versioned factory so we can
+# invalidate the cache when the implementation changes.
+CRUD_CACHE_VERSION = "2025-09-15-01"
+
 @st.cache_resource(show_spinner=False)
-def get_crud() -> GraphCrud:
+def _crud_factory(_version: str) -> GraphCrud:
     return GraphCrud()
+
+def get_crud() -> GraphCrud:
+    return _crud_factory(CRUD_CACHE_VERSION)
 
 # datamodels for each node type
 node_configuration = {

@@ -210,6 +210,51 @@ class GraphCrud:
             result = session.run(query, name=name)
             summary = result.consume()
             return getattr(summary.counters, 'nodes_deleted', 0) > 0
+    
+    def relations_by_name(self, label: str, name: str) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
+        """Return all relationships to and from a node grouped by type.
+
+        The node is identified by its `label` and `name` property.
+
+        Returns a dict of the form:
+        {
+            "REL_TYPE": {
+                "out": [ {"other_id": str, "other_label": str|None, "other_name": str|None, "properties": {...}} ],
+                "in":  [ { ... } ]
+            },
+            ...
+        }
+        """
+        data: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+        with self._driver.session() as session:
+            qlabel = self._quote_label(label)
+
+            # Outgoing
+            out_query = (
+                f"MATCH (n:{qlabel} {{name: $name}})-[r]->(m) "
+                f"RETURN type(r) AS type, 'out' AS dir, elementId(m) AS other_id, "
+                f"labels(m) AS other_labels, m.name AS other_name, properties(r) AS rel_props"
+            )
+            # Incoming
+            in_query = (
+                f"MATCH (m)-[r]->(n:{qlabel} {{name: $name}}) "
+                f"RETURN type(r) AS type, 'in' AS dir, elementId(m) AS other_id, "
+                f"labels(m) AS other_labels, m.name AS other_name, properties(r) AS rel_props"
+            )
+
+            for q in (out_query, in_query):
+                for rec in session.run(q, name=name):
+                    rtype = rec["type"]
+                    direction = rec["dir"]  # 'in' or 'out'
+                    bucket = data.setdefault(rtype, {"out": [], "in": []})
+                    bucket[direction].append({
+                        "other_id": rec["other_id"],
+                        "other_label": rec["other_labels"][0],
+                        "other_name": rec["other_name"],
+                        "properties": rec["rel_props"] or {},
+                    })
+
+            return data
         
     # ==========================
     # Aggregations / Counts
